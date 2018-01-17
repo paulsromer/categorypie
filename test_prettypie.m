@@ -156,7 +156,3 @@ title('Using Array Input');
 figure(3); clf;
 prettypie(struct_bycategory);
 title('Using StructCat Input');
-%%
-figure(4); clf;
-prettypie(struct_inputdata,struct_celldictionary);
-title('Using StructIndiv Input');

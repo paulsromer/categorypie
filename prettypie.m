@@ -45,17 +45,12 @@ elseif isnumeric(pv{1})
     nReqArgs = 2;
     input_dictionary = pv{2};
     input_type = 'numeric';
-elseif isstruct(pv{1}) %Techincally there are two different forms the structure input can take (struct by individual and stuct by category)
+elseif isstruct(pv{1}) %Require struct by category
     validateattributes(pv{1},{'struct'},{'scalar'})
     structfun(@(x) validateattributes(x,{'numeric'},{'vector'}),pv{1}); %,'nonnegative','real','finite','nonnan'
-    if max(structfun(@(x) numel(x), pv{1})) == 1
-        nReqArgs = 2;
-        input_dictionary = pv{2};
-        input_type = 'struct_individual';
-    else
-        nReqArgs = 1;
-        input_type = 'struct_category';
-    end
+    nReqArgs = 1;
+    input_type = 'struct_category';
+    
         
 else
     error('Input type not recognized. prettypie.m accepts as input a cell array, a structure, or a numerical array')
@@ -93,7 +88,15 @@ Opt = p.Results;
 a = 18;
 
 validatestring(Opt.labelmode, {'none', 'auto','category','slice','percentage'}, 'prettypie', 'labelmode');
-
+%%
+%Options for labels:
+%if input_type == 'cell' -> then slicelabels should also be a cell of cells with the same
+%size; categorylabels should be a cell
+%if input_type == 'array' -> then slicelabels should be the same size as
+%array
+%if input_type == 'structcat' -> then slicelabels should be the same size
+%as structcat
+%So I think I want to remove structIndiv. 
 %%
 pie_array = nan(1,100); %Pre-allocate for speed
 pie_categories = nan(1,100);
@@ -147,37 +150,7 @@ switch input_type
         pie_array = pie_array(m);
         pie_categories = pie_categories(m);
 %         pie_slicelabels = pie_slicelabels(m);
-        pie_categorylabels = Opt.categorylabels;
-    case 'struct_individual'
-        %In this case, the input_dictionary can either be a struct or a
-        %cell
-        %Let's assume it's a cell for now, b/c that's what I have
-        i = 1;
-        for categoryInd = 1:numel(input_dictionary)
-%             curr_cat_name = names{categoryInd}
-            curr_cat = input_dictionary{categoryInd}
-
-            curr_array = [];
-            for sInd = 1:numel(curr_cat)
-                curr_species_name = curr_cat{sInd};
-                curr_array(sInd) = input_data.(curr_species_name);
-            end
-            n = numel(curr_array);
-            if Opt.sorted
-               [pie_array(i:i+n-1), I] = sort(curr_array);
-            else
-                pie_array(i:i+n-1) = curr_array(:);
-                I = 1:n;
-            end
-            pie_categories(i:i+n-1) = categoryInd;
-            i = i + n;
-        end
-        m = pie_array./nansum(pie_array) > Opt.plotcutoff;
-        pie_array = pie_array(m);
-        pie_categories = pie_categories(m);
-            
-    
-        
+        pie_categorylabels = Opt.categorylabels;        
     case 'struct_category'
         pie_categorylabels = fieldnames(input_data);
         i = 1;
