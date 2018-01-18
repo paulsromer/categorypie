@@ -1,6 +1,5 @@
 %Contains various test cases for prettypie.m
-
-%% Initialize the test data
+% Initialize the test data
 %
 AddLib('Plot_Tools');
 category_names = {'LightAlkanes','LargeAlkanes','Alkenes','Biogenics','Aromatics','Oxygenates'};
@@ -103,8 +102,8 @@ end
 
 cell_inputdata = {};
 for categoryInd = 1:numel(category_names)
-    curr_cat_name = category_names{categoryInd}
-    curr_cat = components{categoryInd}
+    curr_cat_name = category_names{categoryInd};
+    curr_cat = components{categoryInd};
     
     curr_averages = [];
     for sInd = 1:numel(curr_cat)
@@ -144,35 +143,106 @@ for ind = 1:numel(cell_inputdata)
 end
 
 bad_components = components;
-bad_components{2} = {'Hello World'}
+bad_components{2} = {'Hello World'};
 
 
-%%
-% figure(1); clf;
-% prettypie(cell_inputdata,'labelcutoff',0.01,'plotcutoff',0.0,'sorted',1,'labelfontsize',14,...
-%     'labelmode','slice','slicelabels',components,'categorylabels',category_names);
-% title('Using Cell Input');
-
-% prettypie(cell_inputdata,'labelcutoff',0.00,'plotcutoff',0.0,'sorted',1,'labelfontsize',14,...
-%     'labelmode','slice','slicelabels',bad_components,'categorylabels',category_names);
+%% cell version input, expect to succeed
+figure(1); clf;
+prettypie(cell_inputdata,'labelcutoff',0.01,'plotcutoff',0.0,'sorted',1,'labelfontsize',14,...
+    'labelmode','slice','slicelabels',components,'categorylabels',category_names);
+title('Using Cell Input');
 
 
-%%
+%% array version input, expect to succeed
 figure(2); clf; 
 prettypie(array_inputdata,array_categorical,'plotcutoff',0,'labelmode','category','labelcutoff',0.00,'slicelabels',array_slicenames)
 title('Using Array Input');
-% 
-% bad_array_slicenames = array_slicenames;
-% bad_array_slicenames{88} = 'bad';
-% try 
-%     prettypie(array_inputdata,array_categorical,'plotcutoff',0,'slicelabels',bad_array_slicenames)
-% catch ME
-% %     warning(ME.message);
-% end
-    title('Using Array Input');
 
-%Ok, what if we d
-%%
+ 
+
+%% stuct version input, expect to succeed
 figure(3); clf;
 prettypie(struct_bycategory);
 title('Using StructCat Input');
+
+%% struct version, requesting labelmode category, expect to pass
+figure(4); clf; 
+prettypie(struct_bycategory,'labelmode','category')
+
+%% cell version, many options, expect all to pass
+figure(5); clf; 
+prettypie(cell_inputdata,'labelcutoff',0.01,'sorted',false);
+
+figure(5); clf; 
+prettypie(cell_inputdata,'labelcutoff',1,'sorted',false);
+
+figure(5); clf;
+prettypie(cell_inputdata,'labelcutoff',0,'labelmode','category','categorylabels',category_names);
+
+
+figure(5); clf;
+prettypie(cell_inputdata,'labelcutoff',0,'labelmode','category','categorylabels',category_names,'sorted',0);
+
+figure(5); clf;
+prettypie(cell_inputdata,'labelcutoff',0,'labelmode','category','categorylabels',category_names,'sorted',0,...
+    'labelfontsize',100);
+
+%%
+figure(6); clf;
+prettypie(cell_inputdata,'labelcutoff',0.01,'labelmode','category','categorylabels',category_names,'sorted',1,...
+    'labelfontsize',12,'plotcutoff',0.05,'slicelabels',cell_celllabels);
+
+%%
+figure(7); clf;
+test_struct = struct('LightAlkanes',struct_bycategory.Oxygenates);
+prettypie(test_struct,'labelmode','category')
+
+%% cell version, bad input to sorted, expect to fail
+figure(10); clf
+prettypie(cell_inputdata,'labelcutoff',0,'labelmode','category','categorylabels',category_names,'sorted','HelloWorld');
+
+
+%% cell version, bad input to sorted2, expect to fail
+figure(10); clf
+prettypie(cell_inputdata,'labelcutoff',0,'labelmode','category','categorylabels',category_names,'sorted',{18,22});
+
+%% cell version, called with labelmode category, expect to fail
+figure(10); clf; 
+prettypie(cell_inputdata,'labelcutoff',0.01,'sorted',true, 'labelmode','category');
+
+
+%% cell version, plotcutoff too high, expect to fail
+figure(10); clf; 
+prettypie(cell_inputdata,'plotcutoff',1);
+%% cell version input, expect to fail
+figure(10); clf
+prettypie(cell_inputdata,'labelcutoff',0.00,'plotcutoff',0.0,'sorted',1,'labelfontsize',14,...
+    'labelmode','slice','slicelabels',bad_components,'categorylabels',category_names);
+
+
+%% struct version input with extra category, expect to fail
+figure(10); clf; 
+bad_cat = struct_bycategory;
+bad_cat.Extra = [0.01,0.03,0.015];
+prettypie(bad_cat);
+
+%% struct version with cell dictionary, expect to fail
+figure(10); clf; 
+prettypie(struct_bycategory,struct_celldictionary)
+
+%% array version, but no categories given, expect to fail
+figure(10); clf; 
+prettypie(array_inputdata);
+
+%% struct version, requesting labelmode slice but no slices given, expect to fail
+figure(10); clf; 
+prettypie(struct_bycategory,'labelmode','slice')
+
+%% cell version, requesting labelmode slice but no slices given, expect to fail
+figure(10); clf; 
+prettypie(cell_inputdata,'labelmode','slice')
+
+%% array version, requesting labelmode slice but no slices given, expect to fail
+figure(10); clf; 
+prettypie(array_inputdata, array_categorical,'labelmode','slice')
+

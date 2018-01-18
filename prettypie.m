@@ -1,10 +1,43 @@
 function varargout = prettypie(varargin)
-
-%well, ok, what are the minimum input arguments we need? 
-%There are multiple ones. Let's just start with the cell array of arrays,
-%since that's closest to what we have
+%PRETTYPIE Displays a pie chart organized by category
 %
+% PRETTYPIE(X,G) draws a pie chart of the data in the vectory X grouped by
+% the categorical array G
+%
+% PRETTYPIE(C), where C is a cell array of arrays, draws a pie chart of all
+% the data in C grouped by each array in C [e.g. C = {[1,2,3], [3,3,2],
+% [1,4,1.5]} ]
+%
+% PRETTYPIE(S), where S is a structure, draws a pie chart of all the data
+% in S grouped by the data in S [e.g. S = struct('first group,[1,2,3],
+% 'second group',[3,3,2], 'third group', [1,4,1.5]) ] 
+%
+% PRETTYPIE(AX, ...) produces a pie chart in axes with handle AX.
+%
+% PRETTYPIE(..., 'PARAM1', val1, 'PARAM2', val2, ...) specifies optional
+% parameter name/value pairs.
+%     'plotcutoff'    
+%     'labelcutoff'
+%     'categorylabels'
+%     'slicelabels'
+%     'sorted'
+%     'labelfontsize'
+%     'labelmode'
 
+
+%Options for labels:
+%if input_type == 'cell' -> then slicelabels should also be a cell of cells with the same
+%size; categorylabels should be a cell
+%if input_type == 'array' -> then slicelabels should be the same size as
+%array; 'categorylabels' should be the same size as the # of ca
+%if input_type == 'structcat' -> then slicelabels should be the same size
+%as structcat; categorylabels sohuld be the same size as the # of fields
+%in the structure. 
+%In all cases, categorylabels should be a cell. 
+%So I think I want to remove structIndiv. 
+
+
+%%
 hg2flag = ~verLessThan('matlab', '8.4.0');
 r2016aflag = ~verLessThan('matlab', '9.0.0');
 r2013bflag = ~verLessThan('matlab', '8.2.0');
@@ -20,21 +53,13 @@ ax = newplot(ax);
 
 %Then figure out which set of inputs we have here
 pv = inargs{1};
-if iscell(pv{1})
-    %First option: We enter a cell array of strings
-    %Requirements: All entries in the cell array must be one-dimensional
-    %numeric, all real and positive
-
-    %Using validateattributes for this
-    cellfun(@(x) validateattributes(x,{'numeric'},{'vector'},1),pv{1}) %,'nonnegative','real','finite','nonnan'
+if iscell(pv{1}) %First option: Cell array of strings
+    cellfun(@(x) validateattributes(x,{'numeric'},{'vector'},1),pv{1});
     nReqArgs = 1;
     input_type = 'cell';
     
-elseif isnumeric(pv{1})
-    %If the first input is numeric, then it must satisfy all the important
-    %constraints:
+elseif isnumeric(pv{1}) %Second option: Numeric Array
     validateattributes(pv{1},{'numeric'},{'nonnegative','real','finite'})
-    
     %If the first input is numeric, then the second input must be
     %categorical
     if ~iscategorical(pv{2})
@@ -45,13 +70,12 @@ elseif isnumeric(pv{1})
     nReqArgs = 2;
     input_dictionary = pv{2};
     input_type = 'numeric';
-elseif isstruct(pv{1}) %Require struct by category
+elseif isstruct(pv{1}) %Third option: Structure organized by category
     validateattributes(pv{1},{'struct'},{'scalar'})
-    structfun(@(x) validateattributes(x,{'numeric'},{'vector'}),pv{1}); %,'nonnegative','real','finite','nonnan'
+    structfun(@(x) validateattributes(x,{'numeric'},{'vector'}),pv{1}); 
     nReqArgs = 1;
     input_type = 'struct_category';
     
-        
 else
     error('Input type not recognized. prettypie.m accepts as input a cell array, a structure, or a numerical array')
 end
@@ -66,52 +90,37 @@ else
     addParamMethod = 'addParamValue';
 end
 
-%what if we ditched the labels, and instead had 'categorylabels' and
-%'slicelabels'? %And then also had a 'labelmethod' and a 'legendmethod'
-%options? That might work better. 
-
 p = inputParser;
-% p.addOptional('labels',             {},     @(x) validateattributes(x, {'cell'}, {}));
-p.(addParamMethod)('categorylabels',    {}, @(x) validateattributes(x, {'cell'},{}));
-p.(addParamMethod)('slicelabels',       {}, @(x) validateattributes(x, {'cell'},{}));
-p.(addParamMethod)('labelcutoff',   1,      @(x) validateattributes(x, {'numeric'},{'scalar','nonnegative'}));
-p.(addParamMethod)('plotcutoff',    0,      @(x) validateattributes(x, {'numeric'},{'scalar','nonnegative'}));
-p.(addParamMethod)('sorted',        true,  @(x) validateattributes(x,{'logical','numeric'},{'scalar'}));
-p.(addParamMethod)('labelfontsize',  ax.FontSize,    @(x) validateattributes(x,{'numeric'},{'scalar','integer','positive','finite','real'}));
-p.(addParamMethod)('colorscheme',  {},      @(x) validateattributes(x, {'cell'}, {}));
-p.(addParamMethod)('labelmode',    'auto',  @(x) validateattributes(x, {'string','char'},{}));
-p.(addParamMethod)('trimnans',      false,  @(x) validateattributes(x,{'logical','numeric'},{'scalar'}));
+p.(addParamMethod)('categorylabels',    {},     @(x) validateattributes(x, {'cell'},{}));
+p.(addParamMethod)('slicelabels',       {},     @(x) validateattributes(x, {'cell'},{}));
+p.(addParamMethod)('labelcutoff',       0.01,   @(x) validateattributes(x, {'numeric'},{'scalar','nonnegative'}));
+p.(addParamMethod)('plotcutoff',        0,      @(x) validateattributes(x, {'numeric'},{'scalar','nonnegative'}));
+p.(addParamMethod)('sorted',            true,   @(x) validateattributes(x,{'logical','numeric'},{'scalar'}));
+p.(addParamMethod)('labelfontsize',     ax.FontSize,    @(x) validateattributes(x,{'numeric'},{'scalar','integer','positive','finite','real'}));
+p.(addParamMethod)('colorscheme',       {},     @(x) validateattributes(x, {'cell'}, {}));
+p.(addParamMethod)('labelmode',         'auto', @(x) validateattributes(x, {'string','char'},{}));
 
-p.KeepUnmatched = true;
+% p.KeepUnmatched = false;
 p.parse(optArgs{:});
 Opt = p.Results;
 a = 18;
 
 validatestring(Opt.labelmode, {'none', 'auto','category','slice','percentage'}, 'prettypie', 'labelmode');
+
 %%
-%Options for labels:
-%if input_type == 'cell' -> then slicelabels should also be a cell of cells with the same
-%size; categorylabels should be a cell
-%if input_type == 'array' -> then slicelabels should be the same size as
-%array; 'categorylabels' should be the same size as the # of ca
-%if input_type == 'structcat' -> then slicelabels should be the same size
-%as structcat; categorylabels sohuld be the same size as the # of fields
-%in the structure. 
-%In all cases, categorylabels should be a cell. 
-%So I think I want to remove structIndiv. 
-%%
-pie_array = nan(1,100); %Pre-allocate for speed
+%Read the first 1 or 2 inputs to arrange the data in a form pie.m can read
+pie_array = nan(1,100); 
 pie_categories = nan(1,100);
 pie_slicelabels = cell(1,100);
 use_slicelabels = ~isempty(Opt.slicelabels);
         
-%First case: input_data is a cell array of arrays
-switch input_type
+
+switch input_type 
     case 'cell'
         if use_slicelabels
             validateattributes(Opt.slicelabels,{'cell'},{'numel',numel(input_data),'vector'})
         end
-        i = numel(input_data)
+        i = 1;
         for ind = 1:numel(input_data)
             curr_array = input_data{ind};
             n = numel(curr_array);
@@ -174,7 +183,7 @@ switch input_type
         i = 1;
         for ind = 1:numel(pie_categorylabels)
             curr_fieldname = pie_categorylabels{ind};
-            curr_array = input_data.(curr_fieldname)
+            curr_array = input_data.(curr_fieldname);
             n = numel(curr_array);
             if Opt.sorted
                 [pie_array(i:i+n-1), I] = sort(curr_array(:));
@@ -184,8 +193,7 @@ switch input_type
             end
             pie_categories(i:i+n-1) = ind;
             if use_slicelabels
-                curr_labels = Opt.slicelabels.(curr_fieldname)
-                
+                curr_labels = Opt.slicelabels.(curr_fieldname);
                 pie_slicelabels(i:i+n-1) = curr_labels(I);
             end
             i = i+n;
@@ -271,6 +279,9 @@ for i = 2:2:numel(h)
                 set(h(i),'String','');
             end
         case 'category'
+            if isempty(Opt.categorylabels)
+                error('prettypie.m called with labelmode option ''category'' but no category labels given');
+            end
             set(h(i),'String',''); %There's more to this section later on. 
     
             
@@ -366,15 +377,18 @@ for i = 1:max(pie_categories)
     %none of them, use the one 80% through the category? Pick the one
     %that's between 60-80% that's the biggest percentage? 
     %If that's none, use the 2nd to last or the last if there's one. 
+    shift = sum(n(1:curr_category-1));
     if number_within_category <= 3
-        category_representative_ind(i) = number_within_category;
+        category_representative_ind(i) = number_within_category + shift;
     else
         ind = floor(0.6*number_within_category):floor(0.9*number_within_category);
-        shift = sum(n(1:curr_category-1));
+        
         [c, indind] = max(pie_array(ind+shift));
         category_representative_ind(i) = ind(indind)+shift;
+%         category_patches(i) = 2*category_representative_ind(i)-1;
     end
 end
+category_patches = 2*category_representative_ind-1;
 
 if strcmp(Opt.labelmode,'category')
     for ind = 1:numel(category_representative_ind)
@@ -401,7 +415,6 @@ if strcmp(Opt.labelmode,'category')
 end
 
 figure(h(1).Parent.Parent);
-  
-
-%%
-a = 18;
+n = nargout;
+out = {h, category_patches, all_maps};
+vargout = out(1:nargout);
