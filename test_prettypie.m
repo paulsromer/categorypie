@@ -130,10 +130,12 @@ for categoryInd = 1:numel(category_names)
         curr_species_name = curr_cat{sInd};
         array_inputdata(n) = struct_inputdata.(curr_species_name);
         array_categorical{n} = curr_cat_name;
+        array_slicenames{n} = curr_species_name;
         n = n + 1;
      end
 end
 array_categorical = categorical(array_categorical,category_names);
+
 
 struct_bycategory = struct();
 for ind = 1:numel(cell_inputdata)
@@ -141,16 +143,34 @@ for ind = 1:numel(cell_inputdata)
     struct_bycategory.(curr_fn) = cell_inputdata{ind};
 end
 
+bad_components = components;
+bad_components{2} = {'Hello World'}
+
+
 %%
-figure(1); clf;
-prettypie(cell_inputdata,'labelcutoff',0.01,'plotcutoff',0.0,'sorted',1,'labelfontsize',14,...
-    'labelmode','slice','slicelabels',components,'categorylabels',category_names);
-title('Using Cell Input');
+% figure(1); clf;
+% prettypie(cell_inputdata,'labelcutoff',0.01,'plotcutoff',0.0,'sorted',1,'labelfontsize',14,...
+%     'labelmode','slice','slicelabels',components,'categorylabels',category_names);
+% title('Using Cell Input');
+
+% prettypie(cell_inputdata,'labelcutoff',0.00,'plotcutoff',0.0,'sorted',1,'labelfontsize',14,...
+%     'labelmode','slice','slicelabels',bad_components,'categorylabels',category_names);
+
 
 %%
 figure(2); clf; 
-prettypie(array_inputdata,array_categorical,'plotcutoff',0)
+prettypie(array_inputdata,array_categorical,'plotcutoff',0,'labelmode','category','labelcutoff',0.00,'slicelabels',array_slicenames)
 title('Using Array Input');
+% 
+% bad_array_slicenames = array_slicenames;
+% bad_array_slicenames{88} = 'bad';
+% try 
+%     prettypie(array_inputdata,array_categorical,'plotcutoff',0,'slicelabels',bad_array_slicenames)
+% catch ME
+% %     warning(ME.message);
+% end
+    title('Using Array Input');
+
 %Ok, what if we d
 %%
 figure(3); clf;
