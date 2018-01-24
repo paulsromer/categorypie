@@ -41,6 +41,10 @@ function varargout = prettypie(varargin)
 %                       category will be plotted from smallest to largest.
 %                       [true]
 %
+%   rotatelabels:       Boolean. If true, labels will be rotated to be
+%                       aligned  with the slice they are labeling. Useful
+%                       to labeling small slices [true]. 
+%
 %   labelfontsize:      Scalar. Font size to plot the labels. [Matches the
 %                       font size of the current axes]
 %
@@ -168,6 +172,7 @@ p.(addParamMethod)('labelfontsize',     ax.FontSize,    @(x) validateattributes(
 p.(addParamMethod)('labelmode',         'auto', @(x) validateattributes(x, {'string','char'},{}));
 p.(addParamMethod)('colormaps',         {},     @(x) validateattributes(x, {'cell'},{}))
 p.(addParamMethod)('usecmocean',        [],  @(x) validateattributes(x, {'logical','numeric'},{'scalar'}));
+p.(addParamMethod)('rotatelabels',      true,   @(x) validateattributes(x,{'logical','numeric'},{'scalar'}));
 
 p.KeepUnmatched = true;
 p.PartialMatching = true;
@@ -175,16 +180,17 @@ p.parse(optArgs{:});
 Opt = p.Results;
 Ex = p.Unmatched;
 
-a = 18;
-
+%Extra logic to validate and parse 'labelmode', 'usecmocean', and
+%'colormaps'
 validatestring(Opt.labelmode, {'none', 'auto','category','slice','percentage'}, 'prettypie', 'labelmode');
-if isempty(Opt.usecmocean)
+
+if isempty(Opt.usecmocean) %Don't override use-specified input
     Opt.usecmocean = cmoceanflag;
 end
 if Opt.usecmocean && ~cmoceanflag
     error('usecmocean flag specified but cmocean.m not found');
 end
-if isempty(Opt.colormaps)
+if isempty(Opt.colormaps) %Don't override user-specified input
     if Opt.usecmocean
         Opt.colormaps = {'tempo','matter','turbid','speed','amp','-gray','-ice','-pink','algae'};
     else
@@ -195,20 +201,23 @@ end
 
 
 %%
-%Read the data input(s) to arrange the data in a form pie.m can read
+%--------------------------------------------------
+% Translate the data into a form pie.m can read
+%--------------------------------------------------
+
 pie_array = nan(1,100); 
 pie_categories = nan(1,100);
 pie_slicelabels = cell(1,100);
 use_slicelabels = ~isempty(Opt.slicelabels);
-i = 1;
-    
 
+
+i = 1;
 switch input_type 
     case 'cell'
-        if use_slicelabels
+        if use_slicelabels %Check that form of the labels matches the form of the data
             validateattributes(Opt.slicelabels,{'cell'},{'numel',numel(input_data),'vector'})
         end
-        for ind = 1:numel(input_data)
+        for ind = 1:numel(input_data) %input data is a cell array of arrays
             curr_array = input_data{ind};
             n = numel(curr_array);
             [pie_array, I] = append_array(pie_array, curr_array, i, n, Opt);
@@ -229,7 +238,6 @@ switch input_type
         if use_slicelabels
             validateattributes(Opt.slicelabels,{'cell'},{'size',size(input_dictionary)});
         end
-        i = 1;
         for ind = 1:numel(fn)
             m = pie_categorylabels == fn{ind};
             curr_array = input_data(m);
@@ -252,7 +260,6 @@ switch input_type
             names_match = all(cellfun(@(x1) strcmp(x1,x2),fieldnames(Opt.slicelabels),fieldnames(pie_categorylabels)));
             assert(names_match,'Input Strucuture and slicelabels must have the same fieldnames');
         end
-        i = 1;
         for ind = 1:numel(pie_categorylabels)
             curr_fieldname = pie_categorylabels{ind};
             curr_array = input_data.(curr_fieldname);
@@ -265,9 +272,10 @@ switch input_type
             end
             i = i+n;
         end
-        numer_categories = numel(pie_categorylabels); %Check that this works for a strucutre with a single fieldname;
+        numer_categories = numel(pie_categorylabels); 
 end
-m = pie_array./nansum(pie_array) > Opt.plotcutoff;
+
+m = pie_array./nansum(pie_array) > Opt.plotcutoff; %Apply the plot cutoff math
 pie_array = pie_array(m);
 pie_categories = pie_categories(m);
 if use_slicelabels
@@ -276,7 +284,7 @@ end
 numer_entries = numel(pie_array);
 
 
-%% Validate categorylabels (
+%Validate categorylabels 
 if ~isempty(Opt.categorylabels)
     validateattributes(Opt.categorylabels,{'cell'},{'numel',numer_categories});
 else %If categorylabels is empty, we default to using the categories supplied by the categorical array or the structure
@@ -287,41 +295,14 @@ else %If categorylabels is empty, we default to using the categories supplied by
             Opt.categorylabels = fieldnames(input_data);
     end
 end
-
 %After this point, how the inputs are received should not matter
-%% Use matlab to make the pie for us. 
+
+%%
+%--------------------------------------------------------------
+% Build the pie chart and create the full list of colormaps
+%--------------------------------------------------------------
 h  = pie(pie_array./sum(pie_array)); hold on;
 
-%  
-starting_cat = 1;
-starting_sInd = 1;
-
-%Now do some work on the colormaps:
-
-% all_maps = {'tempo','matter','turbid','speed','amp','-gray','-ice','-pink','algae'};
-all_maps = Opt.colormaps;
-
-if numer_categories > numel(all_maps)
-    all_maps = repmat(all_maps,1,ceil(numer_categories./numel(all_maps)));
-    all_maps = all_maps(1:numer_categories);
-end
-fn = fieldnames(Ex);
-for ind = 1:numel(fn)
-    curr_fn = fn{ind};
-    if strncmp('colormap',curr_fn,8)
-        number = str2double(curr_fn(9:end));
-        name = Ex.(curr_fn);
-        all_maps{number} = name;
-    else
-        warning(['Optional parameter ', curr_fn, ' not recognized.']);
-    end
-end
-% all_maps = {'-summer','-parula','-copper','-spring','-winter','-bone'};
-% all_maps = {'-ice','deep','dense','algae','speed','turbid'};
-curr_map_name = all_maps{starting_cat};
-%Not sure if this is the best way to do it...
-cmap = assign_cmap(curr_map_name);
-l_colors = [];
 
 %% Decide on the label mode and step through once to set the labels
 if strcmp(Opt.labelmode,'auto')
@@ -359,28 +340,50 @@ for i = 2:2:numel(h)
             if pie_array(i/2)./sum(pie_array) < Opt.labelcutoff
                 set(h(i),'String','');
             else
-                set(h(i),'String',pie_slicelabels{i/2});
-                
-                pos = get(h(i),'Position');
-                angle = atand(pos(2)./pos(1));
-
-                pos;
-                r = 1.05;
-                new_pos = [abs(cosd(angle)).*pos(1)./abs(pos(1)),abs(sind(angle)).*pos(2)./abs(pos(2)),0].*r;
-                set(h(i),'Position',new_pos);
-
-
-                set(h(i),'Rotation',angle);
-                if pos(1) < 0
-                    set(h(i),'HorizontalAlignment','Right');
-                else
-                    set(h(i),'HorizontalAlignment','Left');
-                end
+                [slice] = adjust_label(h(i), pie_slicelabels{i/2},Opt.rotatelabels)
+%                 set(h(i),'String',pie_slicelabels{i/2});
+%                 
+%                 pos = get(h(i),'Position');
+%                 angle = atand(pos(2)./pos(1));
+% 
+%                 pos;
+%                 r = 1.05;
+%                 new_pos = [abs(cosd(angle)).*pos(1)./abs(pos(1)),abs(sind(angle)).*pos(2)./abs(pos(2)),0].*r;
+%                 set(h(i),'Position',new_pos);
+% 
+% 
+%                 set(h(i),'Rotation',angle);
+%                 if pos(1) < 0
+%                     set(h(i),'HorizontalAlignment','Right');
+%                 else
+%                     set(h(i),'HorizontalAlignment','Left');
+%                 end
             end
     end
 end
+%%
+%---------------------------------
+% Assign colors to each slice
+%---------------------------------
 
-%%Step through again to set the colors
+all_maps = Opt.colormaps;
+if numer_categories > numel(all_maps)
+    all_maps = repmat(all_maps,1,ceil(numer_categories./numel(all_maps)));
+    all_maps = all_maps(1:numer_categories);
+end
+
+fn = fieldnames(Ex); %Now try to find any individually specified colormaps
+for ind = 1:numel(fn)
+    curr_fn = fn{ind};
+    if strncmp('colormap',curr_fn,8)
+        number = str2double(curr_fn(9:end));
+        name = Ex.(curr_fn);
+        all_maps{number} = name;
+    else
+        warning(['Optional parameter ', curr_fn, ' not recognized.']);
+    end
+end
+
 %Some math to get the colors right:
 for i = 1:max(pie_categories)
     n(i) = sum(pie_categories == i);
@@ -389,43 +392,52 @@ end
 edges = [];
 for i = 1:numel(pie_categories)
     curr_category = pie_categories(i);
-    number_within_category = n(curr_category);
+    number_in_category = n(curr_category);
     position_within_category = i - sum(n(1:curr_category-1));
     if position_within_category == 1
         curr_map_name = all_maps{curr_category};
         cmap = assign_cmap(curr_map_name);
         
+        %Create a white boundary between categories
+        %Make the boundaries a patch to make them adjust as the figure size
+        %changes
         vertices = h(2*i-1).Vertices;
         theta1 = atan2(vertices(2,2),vertices(2,1));
         theta2 = theta1 + .015;
         theta = [theta1:1e-3:theta2, theta2];
         X = [0, cos(theta), 0]; Y = [0, sin(theta), 0];
-        edges(i) = patch(X,Y,'w','facecolor','w','edgecolor','w','linewidth',2); %Make the boundaries a patch to make them respond as you change the size of the figure
-        
+        edges(i) = patch(X,Y,'w','facecolor','w','edgecolor','w','linewidth',2);  
     end
-   
-    
-    set(h(2*i-1),'FaceColor',map_colors(cmap,[0,number_within_category+1],position_within_category));
-    set(h(2*i-1),'EdgeColor',map_colors(cmap,[0,number_within_category+1],position_within_category));
+    set(h(2*i-1),'FaceColor',map_colors(cmap,[0,number_in_category+1],position_within_category));
+    set(h(2*i-1),'EdgeColor',map_colors(cmap,[0,number_in_category+1],position_within_category));
 end
 
-%% Now some additional logic to pick out a section to act as the representative for the category. 
-%Useful for category labels and for legends
+
+%% 
+%-----------------------------------------------------------------------------
+% Pick a slice to act as the representative for each category and label if
+% necessary
+%-----------------------------------------------------------------------------
+
+%Select slices that are late in the category because they have darker
+%colors
 for i = 1:max(pie_categories)
     curr_category = i;
-    number_within_category = n(curr_category);
+    number_in_category = n(curr_category);
     shift = sum(n(1:curr_category-1));
-    if number_within_category <= 3
-        category_representative_ind(i) = number_within_category + shift;
+    if number_in_category <= 3 
+        %For categories with few slices, pick the last slice
+        category_representative_ind(i) = number_in_category + shift;
     else
-        ind = floor(0.6*number_within_category):floor(0.9*number_within_category);
-        
+        %Selects the largest slice that's the late-middle of the
+        %cateogry
+        ind = floor(0.6*number_in_category):floor(0.9*number_in_category);
         [c, indind] = max(pie_array(ind+shift));
         category_representative_ind(i) = ind(indind)+shift;
     end
 end
-category_patches = 2*category_representative_ind-1;
 
+category_patches = 2*category_representative_ind-1; 
 %Use those labels if the labelmode is 'category'
 if strcmp(Opt.labelmode,'category')
     for ind = 1:numel(category_representative_ind)
@@ -433,28 +445,24 @@ if strcmp(Opt.labelmode,'category')
         total_of_that_category = sum(pie_array(m))./sum(pie_array);
         curr_ind = 2*category_representative_ind(ind);
         if total_of_that_category > Opt.labelcutoff
-            set(h(curr_ind),'String',Opt.categorylabels{ind})
-            pos = get(h(curr_ind),'Position');
-            angle = atand(pos(2)./pos(1));
-            r = 1.05;
-            new_pos = [abs(cosd(angle)).*pos(1)./abs(pos(1)),abs(sind(angle)).*pos(2)./abs(pos(2)),0].*r;
-            set(h(curr_ind),'Position',new_pos);
-
-            if pos(1) < 0
-                set(h(curr_ind),'HorizontalAlignment','Right');
-            else
-                set(h(curr_ind),'HorizontalAlignment','Left');
-           end
+            [slice] = adjust_label(h(curr_ind), Opt.categorylabels{ind},Opt.rotatelabels)
         end
     end
 end
 
+%%
+%----------------------------
+% Assign output variables
+%----------------------------
 figure(h(1).Parent.Parent);
 
 out = {h, category_patches, all_maps, edges};
 vargout = out(1:nargout);
 
-
+%%
+%-------------------------
+% Subfunctions
+%-------------------------
 function [new_array, I] = append_array(old_array,curr_array, i, n, Opt)
     if Opt.sorted
         [old_array(i:i+n-1), I] = sort(curr_array(:));
@@ -482,8 +490,41 @@ function [cmap] = assign_cmap(cmap_name)
     end
     
     
+function  [slice] = adjust_label(slice, new_text, rotate_labels)
+    set(slice,'String',new_text);
+
+    pos = get(slice,'Position');
+    angle = atand(pos(2)./pos(1));
+
+    pos;
+    r = 1.05;
+    new_pos = [abs(cosd(angle)).*pos(1)./abs(pos(1)),abs(sind(angle)).*pos(2)./abs(pos(2)),0].*r;
+    set(slice,'Position',new_pos);
+
+    if rotate_labels
+        set(slice,'Rotation',angle);
+    end
+    if pos(1) < 0
+        set(slice,'HorizontalAlignment','Right');
+    else
+        set(slice,'HorizontalAlignment','Left');
+    end
     
+function colors = map_colors(cmap,c_ax,input_vals)
+    n = size(cmap,1);
+    c_range = linspace(c_ax(1),c_ax(2),n);
+
+    trimmed_vals = input_vals;
+    trimmed_vals(trimmed_vals < c_ax(1)) = c_ax(1);
+    trimmed_vals(trimmed_vals > c_ax(2)) = c_ax(2);
+    colors = nan(numel(trimmed_vals),3);
+    for ind = 1:numel(trimmed_vals)
+        curr_tv = trimmed_vals(ind);
+        ci = find(curr_tv >= c_range,1,'last');
+        colors(ind,:) = cmap(ci,:);
+    end
     
        
+    
     
         

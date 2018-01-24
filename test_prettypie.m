@@ -149,13 +149,13 @@ bad_components{2} = {'Hello World'};
 %% cell version input, expect to succeed
 figure(1); clf;
 prettypie(cell_inputdata,'labelcutoff',0.01,'plotcutoff',0.0,'sorted',1,'labelfontsize',14,...
-    'labelmode','slice','slicelabels',components,'categorylabels',category_names);
+    'labelmode','category','slicelabels',components,'categorylabels',category_names,'rotatelabels',false);
 title('Using Cell Input');
 
 %% cell version input, expect to succeed
 figure(8); clf;
 q = fliplr(cell_inputdata);
-cell_inputdata_large = {cell_inputdata{:},cell_inputdata{3},cell_inputdata{5},  q{1}};
+cell_inputdata_large = {cell_inputdata{:},cell_inputdata{3},cell_inputdata{5},  q{1} };
 cats = {'1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20'};
 ac = {'-summer','-copper','-bone','-pink','-gray','-hot'};
 prettypie(cell_inputdata_large,'labelcutoff',0.0,'plotcutoff',0.00,'sorted',1,'labelfontsize',14,...
@@ -210,8 +210,8 @@ prettypie(cell_inputdata,'labelcutoff',0,'labelmode','category','categorylabels'
 
 %%
 figure(6); clf;
-prettypie(cell_inputdata,'labelcutoff',0.01,'labelmode','category','categorylabels',category_names,'sorted',1,...
-    'labelfontsize',12,'plotcutoff',0.05,'slicelabels',cell_celllabels);
+prettypie(cell_inputdata,'labelcutoff',0.01,'labelmode','category','categorylabels',category_names,'sorted',0,...
+    'labelfontsize',24,'plotcutoff',0.01,'slicelabels',cell_celllabels,'rotatelabels',false);
 
 %%
 figure(7); clf;
