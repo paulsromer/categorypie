@@ -9,38 +9,106 @@ function varargout = prettypie(varargin)
 % [1,4,1.5]} ]
 %
 % PRETTYPIE(S), where S is a structure, draws a pie chart of all the data
-% in S grouped by the data in S [e.g. S = struct('first group,[1,2,3],
-% 'second group',[3,3,2], 'third group', [1,4,1.5]) ] 
+% in S grouped by the data in S [e.g. S = struct('first_group,[1,2,3],
+% 'second_group',[3,3,2], 'third_group', [1,4,1.5]) ] 
 %
 % PRETTYPIE(AX, ...) produces a pie chart in axes with handle AX.
 %
 % PRETTYPIE(..., 'PARAM1', val1, 'PARAM2', val2, ...) specifies optional
 % parameter name/value pairs.
-%     'plotcutoff'    
-%     'labelcutoff'
-%     'categorylabels'
-%     'slicelabels'
-%     'sorted'
-%     'labelfontsize'
-%     'labelmode'
 
-
-%Options for labels:
-%if input_type == 'cell' -> then slicelabels should also be a cell of cells with the same
-%size; categorylabels should be a cell
-%if input_type == 'array' -> then slicelabels should be the same size as
-%array; 'categorylabels' should be the same size as the # of ca
-%if input_type == 'structcat' -> then slicelabels should be the same size
-%as structcat; categorylabels sohuld be the same size as the # of fields
-%in the structure. 
-%In all cases, categorylabels should be a cell. 
-%So I think I want to remove structIndiv. 
+% Optional input variables (passed as parameter/value pairs): [default]
+%   plotcutoff:         Scalar. Minimum fraction of the total for a slice to be 
+%                       included in the pie chart. Any entries less than 
+%                       this fraction are removed before plotting.  [0]
+% 
+%   labelcutoff:        Scalar. Minimum fraction of the total for a slice to be 
+%                       labeled. Has no effect if slices are not labeled.
+%                       [0.01]
+% 
+%   categorylabels:     Cell Array. Labels for each category of pie slices. Required if
+%                       labelmode is 'category', unless the inputs were given
+%                       as as structure. Must be the same size as the number 
+%                       of categories. []
+%
+%   slicelabels:        Cell Array of Cells or Cell Array or Structure of cells; 
+%                       Labels for each individual pie slice. Required if
+%                       labelmode is 'slice'. The form and size of
+%                       slicelabels must match that of the input data.
+%                       []. 
+%
+%   sorted:             Boolean. If true, the order of slices in each
+%                       category will be plotted from smallest to largest.
+%                       [true]
+%
+%   labelfontsize:      Scalar. Font size to plot the labels. [Matches the
+%                       font size of the current axes]
+%
+%   labelmode:          String. Specifies how the pie should be labeled.
+%                       Must be: 'none', 'auto','category','slice',
+%                       'percentage'. ['auto']
+%                           'none': No labels
+%                           'percentage': Percentage of total
+%                           'category': One label for each category of slices
+%                           'slice': One label for each slice
+%                           'auto': Chooses based on contexts. Picks the first of 
+%                                  'slice' -> 'category' ->  'percentage' that is
+%                                   possible.
+%
+%   usecmocean:         Boolean. If true, will use cmocean colormaps
+%                       (Unless overridden by 'colormaps'), if false will
+%                       use MATLAB built in colormaps. 
+%
+%   colormaps:          Cell Array. Lists the colormaps to color each 
+%                       category. Each entry in the cell array can be
+%                       a valid entry to colormap.m, or a valid entry to
+%                       cmocean.m. Named entries to colormap.m can be
+%                       prepended with a dash to reverse them, e.g.
+%                       '-parula'. [{'tempo', 'matter', 'turbid', 'speed',
+%                        'amp','-gray', '-ice', '-pink', 'algae'} if cmocean is available,
+%                       otherwise {'-summer','-copper','-bone','-pink','-gray','-hot'}]
+%
+%   colormap#:          Any valid entry to colormap.m or cmocean.m. '#' can
+%                       be any number, and the entry given here will
+%                       replace that entry in colormaps. 
+%
+%
+%
+%
+% Output variables:
+%   h:                  Vector of text and patch handles, in alternating
+%                       order. Equivalent to the output from pie.m
+%
+%   category_patches:   Vector of patches, one to represent each category.
+%                       Convenient for representing each category in a
+%                       legend. 
+%
+%   all_maps:           Cell array of the colormaps (each [nx3]) used in
+%                       to color each category. 
+%   
+%   edges:              Vector of patch handles to the white dividing lines
+%                       between categories. 
+%
+%
+%
+% Example Usages:
+%
+% Cell-Based input:
+%   prettypie({[1,2,3],[3,3,2],[1,4,1.5]},'labelcutoff',0,'labelmode','auto','categorylabels',{'Ordered','Random','Decimal'});
+%
+% Array Based Input:
+%   prettypie([1,2,3,3,3,2,1,4,1.5],categorical([1,1,1,2,2,2,3,3,3]),
+%       'slicelabels',{'A1','A2','A3','B1','B2','B3','C1','C2','C3'},'sorted',false,'usecmocean',false)
+%   
+% Structure Based Input:
+%   prettypie(struct('Ordered',[1,2,3],'Random',[3,3,2],'Decimal',[1,4,1.5]))
 
 
 %%
 hg2flag = ~verLessThan('matlab', '8.4.0');
 r2016aflag = ~verLessThan('matlab', '9.0.0');
 r2013bflag = ~verLessThan('matlab', '8.2.0');
+cmoceanflag = exist('cmocean.m','file') == 2;
 
 %-------------------
 % Parse Inputs
@@ -65,7 +133,7 @@ elseif isnumeric(pv{1}) %Second option: Numeric Array
     if ~iscategorical(pv{2})
         error('Numeric Array input to prettypie must be accompanied by a categorical array')
     else
-        validateattributes(pv{2},{'categorical'},{'size',size(pv{1})}); %size of the categorical array must equal size of the input_data
+        validateattributes(pv{2},{'categorical'},{'size',size(pv{1})},'prettypie','G'); %size of the categorical array must equal size of the input_data
     end    
     nReqArgs = 2;
     input_dictionary = pv{2};
@@ -97,39 +165,53 @@ p.(addParamMethod)('labelcutoff',       0.01,   @(x) validateattributes(x, {'num
 p.(addParamMethod)('plotcutoff',        0,      @(x) validateattributes(x, {'numeric'},{'scalar','nonnegative'}));
 p.(addParamMethod)('sorted',            true,   @(x) validateattributes(x,{'logical','numeric'},{'scalar'}));
 p.(addParamMethod)('labelfontsize',     ax.FontSize,    @(x) validateattributes(x,{'numeric'},{'scalar','integer','positive','finite','real'}));
-p.(addParamMethod)('colorscheme',       {},     @(x) validateattributes(x, {'cell'}, {}));
 p.(addParamMethod)('labelmode',         'auto', @(x) validateattributes(x, {'string','char'},{}));
+p.(addParamMethod)('colormaps',         {},     @(x) validateattributes(x, {'cell'},{}))
+p.(addParamMethod)('usecmocean',        [],  @(x) validateattributes(x, {'logical','numeric'},{'scalar'}));
 
-% p.KeepUnmatched = false;
+p.KeepUnmatched = true;
+p.PartialMatching = true;
 p.parse(optArgs{:});
 Opt = p.Results;
+Ex = p.Unmatched;
+
 a = 18;
 
 validatestring(Opt.labelmode, {'none', 'auto','category','slice','percentage'}, 'prettypie', 'labelmode');
+if isempty(Opt.usecmocean)
+    Opt.usecmocean = cmoceanflag;
+end
+if Opt.usecmocean && ~cmoceanflag
+    error('usecmocean flag specified but cmocean.m not found');
+end
+if isempty(Opt.colormaps)
+    if Opt.usecmocean
+        Opt.colormaps = {'tempo','matter','turbid','speed','amp','-gray','-ice','-pink','algae'};
+    else
+        Opt.colormaps = {'-summer','-copper','-bone','-pink','-gray','-hot'};
+    end
+end
+   
+
 
 %%
-%Read the first 1 or 2 inputs to arrange the data in a form pie.m can read
+%Read the data input(s) to arrange the data in a form pie.m can read
 pie_array = nan(1,100); 
 pie_categories = nan(1,100);
 pie_slicelabels = cell(1,100);
 use_slicelabels = ~isempty(Opt.slicelabels);
-        
+i = 1;
+    
 
 switch input_type 
     case 'cell'
         if use_slicelabels
             validateattributes(Opt.slicelabels,{'cell'},{'numel',numel(input_data),'vector'})
         end
-        i = 1;
         for ind = 1:numel(input_data)
             curr_array = input_data{ind};
             n = numel(curr_array);
-            if Opt.sorted
-                [pie_array(i:i+n-1), I] = sort(curr_array(:));
-            else
-                pie_array(i:i+n-1) = curr_array(:);
-                I = 1:n;
-            end
+            [pie_array, I] = append_array(pie_array, curr_array, i, n, Opt);
             pie_categories(i:i+n-1) = ind;
             if use_slicelabels
                 curr_labels = Opt.slicelabels{ind};
@@ -139,10 +221,8 @@ switch input_type
             i = i + n;
         end
         numer_categories = numel(input_data);
-        m = pie_array./nansum(pie_array) > Opt.plotcutoff;
-        pie_array = pie_array(m);
-        pie_categories = pie_categories(m);
-        pie_slicelabels = pie_slicelabels(m);
+        
+        
     case 'numeric'  
         pie_categorylabels = input_dictionary;
         fn = categories(pie_categorylabels);
@@ -154,12 +234,7 @@ switch input_type
             m = pie_categorylabels == fn{ind};
             curr_array = input_data(m);
             n = numel(curr_array);
-            if Opt.sorted
-                [pie_array(i:i+n-1), I] = sort(curr_array(:));
-            else
-                pie_array(i:i+n-1) = curr_array(:);
-                I = 1:n;
-            end
+            [pie_array, I] = append_array(pie_array, curr_array, i, n, Opt);
             pie_categories(i:i+n-1) = ind;
             if use_slicelabels
              curr_labels = Opt.slicelabels(m);
@@ -169,10 +244,7 @@ switch input_type
             i = i + n;
         end
         numer_categories = numel(fn);
-        m = pie_array./nansum(pie_array) > Opt.plotcutoff;
-        pie_array = pie_array(m);
-        pie_categories = pie_categories(m);
-        pie_slicelabels = pie_slicelabels(m);
+        
     case 'struct_category'
         pie_categorylabels = fieldnames(input_data);
         if use_slicelabels
@@ -185,12 +257,7 @@ switch input_type
             curr_fieldname = pie_categorylabels{ind};
             curr_array = input_data.(curr_fieldname);
             n = numel(curr_array);
-            if Opt.sorted
-                [pie_array(i:i+n-1), I] = sort(curr_array(:));
-            else
-                pie_array(i:i+n-1) = curr_array(:);
-                I = 1:n;
-            end
+            [pie_array, I] = append_array(pie_array, curr_array, i, n, Opt);
             pie_categories(i:i+n-1) = ind;
             if use_slicelabels
                 curr_labels = Opt.slicelabels.(curr_fieldname);
@@ -199,19 +266,17 @@ switch input_type
             i = i+n;
         end
         numer_categories = numel(pie_categorylabels); %Check that this works for a strucutre with a single fieldname;
-        m = pie_array./nansum(pie_array) > Opt.plotcutoff;
-        pie_array = pie_array(m);
-        pie_categories = pie_categories(m);
-        pie_slicelabels = pie_slicelabels(m);
+end
+m = pie_array./nansum(pie_array) > Opt.plotcutoff;
+pie_array = pie_array(m);
+pie_categories = pie_categories(m);
+if use_slicelabels
+    pie_slicelabels = pie_slicelabels(m);
 end
 numer_entries = numel(pie_array);
 
-%After this point, it shouldn't matter how the inputs were recieved, and we
-%can focus on displaying the pie correctly. 
-% if trim
-%%
-%Some checks on categorylabels
 
+%% Validate categorylabels (
 if ~isempty(Opt.categorylabels)
     validateattributes(Opt.categorylabels,{'cell'},{'numel',numer_categories});
 else %If categorylabels is empty, we default to using the categories supplied by the categorical array or the structure
@@ -223,40 +288,43 @@ else %If categorylabels is empty, we default to using the categories supplied by
     end
 end
 
-%Some checks on slicelabels
-% if ~isempty(Opt.slicelabels)
-%     switch input_type
-%         case 'numeric'
-%             validateattributes(Opt.slicelabels,{'cell'},{'numel',numer_entries,'vector'})
-%             cellfun(@(x) validateattributes(x,{'string','char'}),Opt.slicelabels) 
-%         case 'struct_category'
-%             validateattributes(Opt.slicelabels,{'struct'},{'scalar'});
-%             names_match = all(cellfun(@(x1) strcmp(x1,x2),fieldnames(Opt.slicelabels),fieldnames(input_data)));
-%             assert(names_match,'Input Strucuture and slicelabels must have the same fieldnames');
-%             fn =fieldnames(input_data);
-%             for ind = 1:numel(fn)
-%                 curr_fn = fn{ind};
-%                 assert(size(input_data.(fn) == size(Opt.slicelabels.(fn))
-%     end
-% end
-            
-a = 18;
-%%
-%First, make the pie:
+%After this point, how the inputs are received should not matter
+%% Use matlab to make the pie for us. 
 h  = pie(pie_array./sum(pie_array)); hold on;
 
-%Ok, now we need to make it look good. 
-%We do that by stepping through each pie slice and modifying it. 
+%  
 starting_cat = 1;
 starting_sInd = 1;
-all_maps = {'tempo','matter','turbid','speed','amp','-gray'};
+
+%Now do some work on the colormaps:
+
+% all_maps = {'tempo','matter','turbid','speed','amp','-gray','-ice','-pink','algae'};
+all_maps = Opt.colormaps;
+
+if numer_categories > numel(all_maps)
+    all_maps = repmat(all_maps,1,ceil(numer_categories./numel(all_maps)));
+    all_maps = all_maps(1:numer_categories);
+end
+fn = fieldnames(Ex);
+for ind = 1:numel(fn)
+    curr_fn = fn{ind};
+    if strncmp('colormap',curr_fn,8)
+        number = str2double(curr_fn(9:end));
+        name = Ex.(curr_fn);
+        all_maps{number} = name;
+    else
+        warning(['Optional parameter ', curr_fn, ' not recognized.']);
+    end
+end
+% all_maps = {'-summer','-parula','-copper','-spring','-winter','-bone'};
+% all_maps = {'-ice','deep','dense','algae','speed','turbid'};
 curr_map_name = all_maps{starting_cat};
-cmap = cmocean(curr_map_name);
+%Not sure if this is the best way to do it...
+cmap = assign_cmap(curr_map_name);
 l_colors = [];
 
-% Step through once to set the labels
+%% Decide on the label mode and step through once to set the labels
 if strcmp(Opt.labelmode,'auto')
-    a = 18;
     if ~isempty(Opt.slicelabels)
         Opt.labelmode = 'slice';
     else
@@ -266,7 +334,6 @@ if strcmp(Opt.labelmode,'auto')
             Opt.laleblmode = 'percentage';
         end
     end
-    %Some logic here to figure out the label mode
 end
 
 for i = 2:2:numel(h)
@@ -312,71 +379,41 @@ for i = 2:2:numel(h)
             end
     end
 end
-% for i = 2:2:numel(h)
-%  
-%         set(h(i),'fontsize',Opt.labelfontsize);
-%         pos = get(h(i),'Position');
-%         angle = atand(pos(2)./pos(1));
-% 
-%         pos;
-%         r = 1.05;
-%         new_pos = [abs(cosd(angle)).*pos(1)./abs(pos(1)),abs(sind(angle)).*pos(2)./abs(pos(2)),0].*r;
-%         set(h(i),'Position',new_pos);
-% 
-% 
-%         set(h(i),'Rotation',angle);
-%         if pos(1) < 0
-%             set(h(i),'HorizontalAlignment','Right');
-%         else
-%             set(h(i),'HorizontalAlignment','Left');
-%         end
-%         if i == 6
-% %             a(0);
-%         end
-% 
-% 
-%     end 
-% end
 
-a = 18;
-%Step through again to set the colors
+%%Step through again to set the colors
 %Some math to get the colors right:
 for i = 1:max(pie_categories)
     n(i) = sum(pie_categories == i);
 end
 
+edges = [];
 for i = 1:numel(pie_categories)
     curr_category = pie_categories(i);
     number_within_category = n(curr_category);
-    position_within_category = i - sum(n(1:curr_category-1)); %A little weird, but sum(n(1:0)) = 0, so it works
+    position_within_category = i - sum(n(1:curr_category-1));
     if position_within_category == 1
         curr_map_name = all_maps{curr_category};
-        cmap = cmocean(curr_map_name);
+        cmap = assign_cmap(curr_map_name);
         
         vertices = h(2*i-1).Vertices;
-%         plot([vertices(1,1),vertices(2,1)],[vertices(1,2),vertices(2,2)],'-w','linewidth',3);
         theta1 = atan2(vertices(2,2),vertices(2,1));
         theta2 = theta1 + .015;
         theta = [theta1:1e-3:theta2, theta2];
         X = [0, cos(theta), 0]; Y = [0, sin(theta), 0];
-        patch(X,Y,'w','facecolor','w','edgecolor','w','linewidth',2);
+        edges(i) = patch(X,Y,'w','facecolor','w','edgecolor','w','linewidth',2); %Make the boundaries a patch to make them respond as you change the size of the figure
         
     end
-    %Now some additional logic to pick out a section to act as the
-    %representative for the category. 
+   
     
     set(h(2*i-1),'FaceColor',map_colors(cmap,[0,number_within_category+1],position_within_category));
     set(h(2*i-1),'EdgeColor',map_colors(cmap,[0,number_within_category+1],position_within_category));
 end
 
+%% Now some additional logic to pick out a section to act as the representative for the category. 
+%Useful for category labels and for legends
 for i = 1:max(pie_categories)
     curr_category = i;
     number_within_category = n(curr_category);
-    %if number_within_category < 3
-    %Pick the darkest one that's at least 5 percent of the total? If that's
-    %none of them, use the one 80% through the category? Pick the one
-    %that's between 60-80% that's the biggest percentage? 
-    %If that's none, use the 2nd to last or the last if there's one. 
     shift = sum(n(1:curr_category-1));
     if number_within_category <= 3
         category_representative_ind(i) = number_within_category + shift;
@@ -385,11 +422,11 @@ for i = 1:max(pie_categories)
         
         [c, indind] = max(pie_array(ind+shift));
         category_representative_ind(i) = ind(indind)+shift;
-%         category_patches(i) = 2*category_representative_ind(i)-1;
     end
 end
 category_patches = 2*category_representative_ind-1;
 
+%Use those labels if the labelmode is 'category'
 if strcmp(Opt.labelmode,'category')
     for ind = 1:numel(category_representative_ind)
         m = pie_categories == ind;
@@ -399,8 +436,6 @@ if strcmp(Opt.labelmode,'category')
             set(h(curr_ind),'String',Opt.categorylabels{ind})
             pos = get(h(curr_ind),'Position');
             angle = atand(pos(2)./pos(1));
-
-            pos;
             r = 1.05;
             new_pos = [abs(cosd(angle)).*pos(1)./abs(pos(1)),abs(sind(angle)).*pos(2)./abs(pos(2)),0].*r;
             set(h(curr_ind),'Position',new_pos);
@@ -409,12 +444,46 @@ if strcmp(Opt.labelmode,'category')
                 set(h(curr_ind),'HorizontalAlignment','Right');
             else
                 set(h(curr_ind),'HorizontalAlignment','Left');
-            end
+           end
         end
     end
 end
 
 figure(h(1).Parent.Parent);
-n = nargout;
-out = {h, category_patches, all_maps};
+
+out = {h, category_patches, all_maps, edges};
 vargout = out(1:nargout);
+
+
+function [new_array, I] = append_array(old_array,curr_array, i, n, Opt)
+    if Opt.sorted
+        [old_array(i:i+n-1), I] = sort(curr_array(:));
+    else
+        old_array(i:i+n-1) = curr_array(:);
+        I = 1:n;
+    end
+    new_array = old_array;
+    
+function [cmap] = assign_cmap(cmap_name)
+    try
+        cmap = cmocean(cmap_name);
+    catch E
+        if strcmp(E.message,'Unrecognized colormap name.') || strcmp(E.identifier,'MATLAB:UndefinedFunction')
+            if strncmp(cmap_name,'-',1)
+                cmap_name = cmap_name(2:end);
+                cmap = colormap(cmap_name);
+                cmap = flipud(cmap);
+            else
+                cmap = colormap(cmap_name);
+            end
+        else
+            rethrow(E)
+        end
+    end
+    
+    
+    
+    
+       
+    
+        

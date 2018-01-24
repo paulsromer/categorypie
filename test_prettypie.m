@@ -152,6 +152,27 @@ prettypie(cell_inputdata,'labelcutoff',0.01,'plotcutoff',0.0,'sorted',1,'labelfo
     'labelmode','slice','slicelabels',components,'categorylabels',category_names);
 title('Using Cell Input');
 
+%% cell version input, expect to succeed
+figure(8); clf;
+q = fliplr(cell_inputdata);
+cell_inputdata_large = {cell_inputdata{:},cell_inputdata{3},cell_inputdata{5},  q{1}};
+cats = {'1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20'};
+ac = {'-summer','-copper','-bone','-pink','-gray','-hot'};
+prettypie(cell_inputdata_large,'labelcutoff',0.0,'plotcutoff',0.00,'sorted',1,'labelfontsize',14,...
+    'labelmode','none');
+title('Using Cell Input');
+%Best in that...summer, copper, pink, gra
+%{'cool','-hot','-summer','-copper','parula','-bone','-gray','-pink'}
+
+%%
+figure(9); clf; 
+prettypie({[1,2,3],[3,1,5],[1,4,1.5]},'labelcutoff',0,'labelmode','auto',...
+    'categorylabels',{'Ordered','Random','Decimal'},'usecmocean',false,'sort',false);
+
+%%
+figure(9); clf; 
+prettypie([1,2,3,3,1,5,1,4,1.5],categorical([1,1,1,2,2,2,3,3,3]),'labelcutoff',0,'labelmode','percentage','sort',false);
+
 
 %% array version input, expect to succeed
 figure(2); clf; 
@@ -197,6 +218,10 @@ figure(7); clf;
 test_struct = struct('LightAlkanes',struct_bycategory.Oxygenates);
 prettypie(test_struct,'labelmode','category')
 
+%% stuct version input, expect to succeed
+figure(8); clf;
+prettypie(struct_bycategory,'categorylabels',{'Light Alkanes','>C_5 Alkanes','Alkenes','Biogenics','Aromatics','Oxygenates'});
+title('Using StructCat Input')
 %% cell version, bad input to sorted, expect to fail
 figure(10); clf
 prettypie(cell_inputdata,'labelcutoff',0,'labelmode','category','categorylabels',category_names,'sorted','HelloWorld');
