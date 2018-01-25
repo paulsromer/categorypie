@@ -61,7 +61,8 @@ function varargout = categorypie(varargin)
 %
 %   usecmocean:         Boolean. If true, will use cmocean colormaps
 %                       (Unless overridden by 'colormaps'), if false will
-%                       use MATLAB built in colormaps. 
+%                       use MATLAB built in colormaps. cmocean colormaps
+%                       are available at https://www.mathworks.com/matlabcentral/fileexchange/57773-cmocean-perceptually-uniform-colormaps
 %
 %   colormaps:          Cell Array. Lists the colormaps to color each 
 %                       category. Each entry in the cell array can be
